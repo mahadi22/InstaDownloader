@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            InstaDownloader
 // @namespace       mahadi22
-// @version         1.5.3
+// @version         1.7.3
 // @description     View or download images, stories, albums, photos, videos and profile avatars.
 // @author          mahadi22
 // @homepage        https://github.com/mahadi22/InstaDownloader
@@ -14,18 +14,20 @@
 // ==/UserScript==
 
 /*
+ * # Instructions.
+ *
  * Simply hold down a modifier key and click on any Instagram photo, video or profile avatar!
  *
  * - `Shift-click`: View in the same tab.
  * - `Alt-click`: View in a new tab/window.
- * - `Shift-Alt-click`: Direct download (only if your browser supports it).
+ * - `Shift-Alt-click`: Direct download if supported by browser.
  *
  * Alternatively, you can use the keyboard controls, which are definitely a lot more convenient
  * if you're already using Instagram's own `left`/`right`-arrow navigation to switch between media!
  *
  * - `Shift-F`: View in the same tab.
  * - `Alt-F`: View in a new tab/window.
- * - `Shift-Alt-F`: Direct download (only if your browser supports it).
+ * - `Shift-Alt-F`: Direct download if supported by browser.
  */
  
 (function() {
@@ -58,28 +60,29 @@
                 }
             }
 
-            // Clean up the URL (via the anchor) to get the unmodified, highest quality media file:
-            if (!isProtectedUrl) {
-                // Always enforce HTTPS for download integrity (protects against sudden truncation).
-                anchor.protocol = 'https:';
+            // Always enforce HTTPS for download integrity (protects against sudden truncation).
+            anchor.protocol = 'https:';
 
-                // Remove useless "se=7" and "ig_cache_key=..." query-params if they exist.
-                // NOTE: We can't just remove the entire query, since some media requires
-                // special protection keys to allow the download to proceed.
-                if (typeof anchor.search === 'string' && anchor.search.length > 0) {
-                    var queryParts = anchor.search.split('&');
-                    for (i = queryParts.length - 1; i >= 0; --i) {
-                        if (queryParts[i].match(/^\??(?:ig_cache_key|se)=/)) {
-                            queryParts.splice(i, 1);
-                        }
+            // Remove useless "se=7", "ig_tt=..." and "ig_cache_key=..." query-params if they exist.
+            // NOTE: We can't just remove the entire query, since some media requires
+            // special protection keys to allow the download to proceed.
+            if (typeof anchor.search === 'string' && anchor.search.length > 0) {
+                var queryParts = anchor.search.split('&');
+                for (i = queryParts.length - 1; i >= 0; --i) {
+                    if (queryParts[i].match(/^\??(?:ig_cache_key|se|ig_tt)=/)) {
+                        queryParts.splice(i, 1);
                     }
-                    var newQuery = queryParts.join('&');
-                    if (newQuery.length > 0 && newQuery.charAt(0) !== '?') {
-                        newQuery = '?'+newQuery; // Only added if a search query still exists.
-                    }
-                    anchor.search = newQuery;
                 }
+                var newQuery = queryParts.join('&');
+                if (newQuery.length > 0 && newQuery.charAt(0) !== '?') {
+                    newQuery = '?'+newQuery; // Only added if a search query still exists.
+                }
+                anchor.search = newQuery;
+            }
 
+            // Clean up the URL's PATH (via the anchor) to get the unmodified, highest quality media file:
+            // NOTE: Protected URLs do not allow modifying ANY part of the PATH to the file.
+            if (!isProtectedUrl) {
                 // Remove bad flags that would cause us to retrieve modified media.
                 //
                 // KEEP:
@@ -106,11 +109,54 @@
 
             // Perform appropriate action based on the pressed modifier keys.
             if (e.shiftKey && e.altKey) { // [Shift+Alt]: Download.
-                // Turn the anchor into a download-anchor and just click it.
-                // NOTE: This HTML 5 feature won't work in all browsers.
-                anchor.target = '_self';
-                anchor.download = filename; // Save with bare filename.
-                anchor.click();
+                if (!window.fetch) {
+                    // Turn the anchor into a download-anchor and just click it.
+                    // NOTE: This HTML 5 feature won't work in all browsers, and in fact CORS has been
+                    // disabled in Chrome 65+ due to security, which isn't unexpected since all other
+                    // browsers such as Safari already prevented cross-origin "download"-attr links.
+                    anchor.target = '_self';
+                    anchor.download = filename; // Save with bare filename.
+                    anchor.click();
+                } else {
+                    // The browser supports window.fetch(). Perform asynchronous blob-based download.
+                    // Docs: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
+                    // NOTE: Browsers support up to around 500MB blobs. The largest Instagram
+                    // media I've ever found was a 14MB video. Most videos are around 1-2MB.
+                    window.fetch(anchor.href, {
+                        headers: new Headers({
+                            'Origin': location.origin
+                        }),
+                        mode: 'cors',
+                        redirect: 'follow',
+                        referrerPolicy: 'no-referrer',
+                        // NOTE: Safari sucks at CORS caching and will re-fetch the URL every time.
+                        // But Chrome on the other hand caches the downloaded file perfectly.
+                        cache: 'force-cache' // https://fetch.spec.whatwg.org/#concept-request-cache-mode
+                    }).then(function(response) {
+                        // This triggers immediately when the headers are received (before the body).
+                        // NOTE: There's no way to show the user the download progress (unlike normal
+                        // download URLs which end up in a browser's download list and show progress
+                        // that way), but most media files are tiny and finish quickly.
+                        if (!response.ok || response.status !== 200) {
+                            throw new Error('Network response was not ok.');
+                        }
+                        return response.blob();
+                    }).then(function(blob) {
+                        // This triggers when the download is 100% complete.
+                        var blobUrl = URL.createObjectURL(blob),
+                            a = document.createElement('a');
+                        // Download the blob URL via an anchor. And since a `blob:` URL doesn't
+                        // violate the CORS destination rules, this works in all modern browsers.
+                        // Verified browsers: Safari and Google Chrome.
+                        a.href = blobUrl;
+                        a.download = filename;
+                        a.click();
+                    }).catch(function(e) {
+                        var errMsg = '"'+e+'" when downloading "'+filename+'".';
+                        console.error(errMsg);
+                        alert(errMsg);
+                    });
+                }
             } else if (e.altKey) { // [Alt]: Open in a new tab/window.
                 var win = window.open(anchor.href, '_blank');
                 win.focus(); // Bring the tab/window to the foreground.
@@ -537,7 +583,7 @@
         };
 
         var autoCloseMobileAppDialog = function() {
-            // The "Experience the best version of Instagram by getting the mobile app" popup dialog box
+            // The "Experience the best version of Instagram by getting the mobile app" modal dialog box
             // only appears when `#reactivated` is in the URL hash. Which means at least 11 characters.
             // NOTE: Only some accounts get this dialog. It doesn't seem related to whether the mobile app has
             // been used by the account, because new accounts that haven't used the mobile app don't get it.
@@ -588,8 +634,10 @@
             }
         };
 
-        var autoCloseSignupBar = function() {
-            // First handle their black, modern, semi-transparent bar... This is the one they show most often.
+        var autoCloseAnnoyingBars = function() {
+            var i, elem, elems;
+
+            // First handle their black, modern, semi-transparent "signup" bar... This is the one they show most often.
             var signupBar = document.querySelector('div.coreSpriteLoggedOutGenericUpsell');
             if (signupBar) {
                 var closeButton = signupBar.parentNode.parentNode.querySelector('.coreSpriteDismissLarge[role="button"]');
@@ -602,8 +650,24 @@
             if (whiteBar) {
                 var signupLink = whiteBar.parentNode.parentNode.parentNode.parentNode.querySelector('a[href*="signup"]');
                 if (signupLink) {
-                    var elem, elems = signupLink.parentNode.parentNode.childNodes;
-                    for (var i = elems.length - 1; i >= 0; --i) {
+                    elems = signupLink.parentNode.parentNode.childNodes;
+                    for (i = elems.length - 1; i >= 0; --i) {
+                        elem = elems[i];
+                        if (elem.tagName === 'SPAN' && elem.textContent === '✕') { // We check this to be 100% sure we've found it.
+                            elem.click();
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Lastly, handle their "Experience the best version of Instagram by getting the app." bar, which is at the bottom when logged in.
+            var getAppBar = document.querySelector('.coreSpriteAppIcon');
+            if (getAppBar) {
+                var appStoreLink = getAppBar.parentNode.parentNode.querySelector('a[href*="itunes.apple.com"]');
+                if (appStoreLink) {
+                    elems = appStoreLink.parentNode.parentNode.parentNode.parentNode.parentNode.childNodes;
+                    for (i = elems.length - 1; i >= 0; --i) {
                         elem = elems[i];
                         if (elem.tagName === 'SPAN' && elem.textContent === '✕') { // We check this to be 100% sure we've found it.
                             elem.click();
@@ -619,7 +683,7 @@
         setInterval(function() {
             autoLoadMore();
             autoCloseMobileAppDialog();
-            autoCloseSignupBar();
+            autoCloseAnnoyingBars();
         }, 400);
     };
 
