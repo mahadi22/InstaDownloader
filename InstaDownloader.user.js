@@ -1,17 +1,16 @@
 // ==UserScript==
 // @name            InstaDownloader
 // @namespace       mahadi22
-// @version         1.1.0
-// @description     View or download images, stories, albums, photos, videos and profile avatars.
 // @author          mahadi22
-// @namespace       mahadi22
+// @version         1.8.1
+// @description     View or download images, stories, albums, photos, videos and profile avatars.
 // @homepage        https://github.com/mahadi22/InstaDownloader
+// @downloadURL     https://github.com/mahadi22/InstaDownloader/raw/main/InstaDownloader.user.js
+// @icon            https://raw.githubusercontent.com/mahadi22/InstaDownloader/main/favicon.ico
 // @license         https://www.apache.org/licenses/LICENSE-2.0
 // @match           *://*.instagram.com/*
 // @run-at          document-start
 // @grant           none
-// @downloadURL     https://github.com/mahadi22/InstaDownloader/raw/main/user.js
-// @icon             https://raw.githubusercontent.com/mahadi22/InstaDownloader/main/favicon.ico
 // ==/UserScript==
 
 /*
@@ -37,18 +36,12 @@
     var injectMediaMagnifier = function() {
         var handleMedia = function(e, url) {
             var i;
-
-
             if (typeof url !== 'string' || url.length < 1) {
                 return true; 
             }
-
             var anchor = document.createElement('a');
             anchor.href = url;
-
-            
             var isProtectedUrl = !!(anchor.pathname.match(/\/vp\//) || anchor.search.match(/[?&](?:oh|oe|efg)=/));
-
             var filename = null,
                 filenameOffset = anchor.pathname.lastIndexOf('/');
             if (filenameOffset >= 0) {
@@ -57,36 +50,23 @@
                     filename = null;
                 }
             }
-
-            if (!isProtectedUrl) {
-                
-                anchor.protocol = 'https:';
-
-                if (typeof anchor.search === 'string' && anchor.search.length > 0) {
-                    var queryParts = anchor.search.split('&');
-                    for (i = queryParts.length - 1; i >= 0; --i) {
-                        if (queryParts[i].match(/^\??(?:ig_cache_key|se)=/)) {
-                            queryParts.splice(i, 1);
-                        }
+            anchor.protocol = 'https:';
+            
+            if (typeof anchor.search === 'string' && anchor.search.length > 0) {
+                var queryParts = anchor.search.split('&');
+                for (i = queryParts.length - 1; i >= 0; --i) {
+                    if (queryParts[i].match(/^\??(?:ig_cache_key|se|ig_tt)=/)) {
+                        queryParts.splice(i, 1);
                     }
-                    var newQuery = queryParts.join('&');
-                    if (newQuery.length > 0 && newQuery.charAt(0) !== '?') {
-                        newQuery = '?'+newQuery; 
-                    }
-                    anchor.search = newQuery;
                 }
-
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
+                var newQuery = queryParts.join('&');
+                if (newQuery.length > 0 && newQuery.charAt(0) !== '?') {
+                    newQuery = '?'+newQuery; 
+                }
+                anchor.search = newQuery;
+            }
+            
+            if (!isProtectedUrl) {
                 var flags = anchor.pathname.split('/');
                 //flags.splice(flags.length - 1, 1); 
                 for (i = flags.length - 1; i >= 0; --i) {
@@ -97,16 +77,39 @@
                 //anchor.pathname = flags.join('/')+'/'+filename; 
                 anchor.pathname = flags.join('/');
             }
-
-            
-
             
             if (e.shiftKey && e.altKey) { 
-                
-                
-                anchor.target = '_self';
-                anchor.download = filename; 
-                anchor.click();
+                if (!window.fetch) {
+                    anchor.target = '_self';
+                    anchor.download = filename; 
+                    anchor.click();
+                } else {
+                    window.fetch(anchor.href, {
+                        headers: new Headers({
+                            'Origin': location.origin
+                        }),
+                        mode: 'cors',
+                        redirect: 'follow',
+                        referrerPolicy: 'no-referrer',
+                        cache: 'force-cache' 
+                    }).then(function(response) {
+                        if (!response.ok || response.status !== 200) {
+                            throw new Error('Network response was not ok.');
+                        }
+                        return response.blob();
+                    }).then(function(blob) {
+                        
+                        var blobUrl = URL.createObjectURL(blob),
+                            a = document.createElement('a');
+                        a.href = blobUrl;
+                        a.download = filename;
+                        a.click();
+                    }).catch(function(e) {
+                        var errMsg = '"'+e+'" when downloading "'+filename+'".';
+                        console.error(errMsg);
+                        alert(errMsg);
+                    });
+                }
             } else if (e.altKey) { 
                 var win = window.open(anchor.href, '_blank');
                 win.focus(); 
@@ -118,35 +121,20 @@
             e.preventDefault(); 
             return false;
         };
-
-        var handleElement = function (e, elem) {
+        var handleElement = function (e, elem, isLastAttempt) {
             switch (elem.tagName) {
                 case 'IMG':
                 case 'VIDEO':
                 case 'DIV':
                 case 'A':
-                    
-                    
-                    
-                    
-
-                    
-                    
-                    
-                    
-                    
                     var elemIsMedia = (elem.tagName === 'IMG' || elem.tagName === 'VIDEO'),
                         mediaContainer = (elemIsMedia ? elem : (elem.parentNode || elem)),
                         photos = (mediaContainer.tagName === 'IMG' ? [mediaContainer] : (elemIsMedia ? [] : mediaContainer.getElementsByTagName('img'))),
                         videos = (mediaContainer.tagName === 'VIDEO' ? [mediaContainer] : (elemIsMedia ? [] : mediaContainer.getElementsByTagName('video')));
-
                     
                     if (videos.length === 1 && photos.length === 0) {
-                        
                         var src = videos[0].hasAttribute('src') ? videos[0].src : null;
                         if (typeof src !== 'string' || src.length < 1) {
-                            
-                            
                             var subSources = videos[0].getElementsByTagName('source');
                             for (var i = 0; i < subSources.length; ++i) {
                                 if (subSources[i].hasAttribute('src') && typeof subSources[i].src === 'string' && subSources[i].src.length >= 1) {
@@ -159,47 +147,31 @@
                     } else if (photos.length === 1 && videos.length === 0) {
                         
                         return handleMedia(e, photos[0].src);
+                    } else if (!isLastAttempt) {
+                        
+                        
+                        return handleElement(e, mediaContainer, true);
                     }
             }
-
             return true; 
         };
 
-        
         document.addEventListener('click', function(e) {
             e = e || window.event;
-
-            
             if (!e.shiftKey && !e.altKey) {
                 return true; 
             }
-
-            
             var target = e.target || e.srcElement;
 
             return handleElement(e, target);
         }, true); 
 
-        
         document.addEventListener('keydown', function(e) {
             e = e || window.event;
-
-            
             if (e.target && (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT')) {
                 return true; 
             }
-
-            
             if ((e.shiftKey || e.altKey) && e.keyCode === 70) {
-                
-                
-                
-                
-                
-                
-                
-                
-                
                 var mediaPanel = document.querySelector(
                     'div[role="dialog"] article > div:nth-of-type(1), main[role="main"] > * article > div:nth-of-type(1), #react-root > section > div > div > section > div:nth-of-type(2)'
                 );
@@ -212,30 +184,18 @@
                     }
                 }
             }
-
             return true; 
         }, true); 
     };
-
     var injectMediaCounter = function() {
-        
         var SectionState = function(section) {
             this.section = section;
             this.loadedMediaIds = new Set();
             this.loadedCount = -1;
             this.totalCount = -1;
-            
-            
             this.mediaBoxElem = section ? section.querySelector('main > article > div > div:nth-of-type(1)') : null;
         };
-
-        
         SectionState.prototype.updateTotalMediaCount = function() {
-            
-            
-            
-            
-            
             var mediaCountSpans = this.section.querySelectorAll('header ul > li:nth-of-type(1) span');
             for (var i = mediaCountSpans.length - 1; i >= 0; --i) { 
                 
@@ -250,21 +210,15 @@
                     } catch (e) {}
                 }
             }
-
             this.totalCount = 0; 
         };
-
-        
         SectionState.prototype.updateLoadedMediaCount = function() {
-            
-            
             var count = 0;
             if (this.mediaBoxElem) {
                 var mediaLinks = this.mediaBoxElem.querySelectorAll('a[href^="/p/"]');
                 for (var i = 0, len = mediaLinks.length; i < len; ++i) {
                     this.loadedMediaIds.add(mediaLinks[i].pathname); 
                 }
-
                 count = this.loadedMediaIds.size;
                 if (count > this.totalCount) {
                     count = this.totalCount; 
@@ -273,32 +227,23 @@
 
             this.loadedCount = count;
         };
-
-        
         var MediaCounter = function() {
-            
             this.currentProfile = this.extractProfileName(location.pathname);
             this.activeState = null;
             this.counterElem = null;
             this.isCounterVisible = false;
             this.updateCooldownTimer = undefined;
-
-            
             this.createCounterElem();
             this.attachReactRootObserver();
             this.startWatchingPathname();
         };
 
-        
         MediaCounter.prototype.createCounterElem = function() {
-            
             var floatContainer = document.createElement('div');
             floatContainer.style.position = 'fixed';
             floatContainer.style.bottom = 0;
             floatContainer.style.right = 0;
             floatContainer.style.zIndex = '99999';
-
-            
             var counterElem = document.createElement('div');
             counterElem.style.margin = '14px'; 
             counterElem.style.padding = '5px 10px'; 
@@ -311,20 +256,11 @@
             counterElem.style.display = 'none'; 
             counterElem.title = 'Shift-[click/F]: View in the same tab.\nAlt-[click/F]: View in a new tab/window.\nShift-Alt-[click/F]: Direct download.';
             floatContainer.appendChild(counterElem);
-
-            
-            
             document.body.appendChild(floatContainer);
-
             this.counterElem = counterElem;
         };
-
-        
         MediaCounter.prototype.extractProfileName = function(pathname) {
             if (typeof pathname === 'string') {
-                
-                
-                
                 var match = pathname.match(/^\/([^\/]+)\/?$/); 
                 if (match) {
                     var profile = match[1];
@@ -333,22 +269,15 @@
                     }
                 }
             }
-
             return null;
         };
 
-        
-        
         MediaCounter.prototype.startWatchingPathname = function() {
             var self = this,
                 currentPathname = null;
             setInterval(function() {
-                
                 if (location.pathname !== currentPathname) {
                     currentPathname = location.pathname;
-
-                    
-                    
                     var profile = self.extractProfileName(currentPathname);
                     if (profile !== null) { 
                         if (profile === self.currentProfile && self.counterElem.textContent !== '') { 
@@ -364,64 +293,37 @@
             }, 250);
         };
 
-        
         MediaCounter.prototype.toggleMediaCounterVisibility = function(showCounter) {
             if (showCounter !== this.isCounterVisible) {
                 this.counterElem.style.display = showCounter ? 'block' : 'none';
                 this.isCounterVisible = !!showCounter;
             }
         };
-
         
         MediaCounter.prototype.updateMediaCounter = function(forceUpdateTotal) {
             if (!this.activeState) {
                 return;
             }
-
-            
             if (forceUpdateTotal || this.activeState.totalCount < 0) {
                 this.activeState.updateTotalMediaCount(); 
             }
             this.activeState.updateLoadedMediaCount();
-
-            
             var percentLoaded = this.activeState.totalCount > 0 ? ((this.activeState.loadedCount / this.activeState.totalCount) * 100) : 0; 
             percentLoaded = percentLoaded.toFixed(1); 
             this.counterElem.textContent = this.activeState.loadedCount+' / '+this.activeState.totalCount+' ('+percentLoaded+'%)';
-
-            
             this.toggleMediaCounterVisibility(this.extractProfileName(location.pathname) !== null);
         };
-
-        
-        
         
         MediaCounter.prototype.observeSection = function(section) {
-            
-            
-            
             var state = new SectionState(section);
-
-            
-            
-            
             if (!state.mediaBoxElem) {
-                
                 this.activeState = null;
                 this.toggleMediaCounterVisibility(false);
                 return; 
             }
-
-            
             this.activeState = state;
-
-            
             this.updateMediaCounter(true);
-
-            
             this.unobserveSection(section);
-
-            
             var self = this,
                 config = { attributes: false, childList: true, characterData: false },
                 observer = new MutationObserver(function(mutations) {
@@ -429,7 +331,6 @@
                         if (mutation.type === 'childList') {
                             clearTimeout(self.updateCooldownTimer);
                             self.updateCooldownTimer = setTimeout(function() {
-                                
                                 if (state === self.activeState) {
                                     self.updateMediaCounter();
                                 }
@@ -438,11 +339,8 @@
                     });
                 });
             observer.observe(state.mediaBoxElem, config);
-
-            
             section.instaMagnifyObserver = observer;
         };
-
         
         MediaCounter.prototype.unobserveSection = function(section) {
             if (section.instaMagnifyObserver) {
@@ -450,7 +348,6 @@
                 delete section.instaMagnifyObserver;
             }
         };
-
         
         MediaCounter.prototype.attachReactRootObserver = function() {
             var self = this,
@@ -458,8 +355,6 @@
                 config = { attributes: false, childList: true, characterData: false },
                 observer = new MutationObserver(function(mutations) {
                     mutations.forEach(function(mutation) {
-                        
-                        
                         if (mutation.type === 'childList') {
                             for (var i = 0; i < interestingChanges.length; ++i) {
                                 var field = interestingChanges[i];
@@ -482,8 +377,6 @@
             var reactRootElem = document.querySelector('span#react-root');
             if (reactRootElem) {
                 observer.observe(reactRootElem, config);
-
-                
                 var children = reactRootElem.childNodes;
                 for (var i = 0; i < children.length; ++i) {
                     var node = children[i];
@@ -493,29 +386,17 @@
                 }
             }
         };
-
         
         var mediaCounter = new MediaCounter();
     };
 
     var injectAutoActions = function() {
         var autoLoadMore = function() {
-            
-            
-            
-            
             if (window.pageYOffset <= 500) {
                 return;
             }
-
-            
-            
-            
-            
             var loadMore = document.querySelectorAll('article > div > a[href*="max_id="]');
             for (var i = 0; i < loadMore.length; ++i) {
-                
-                
                 if (loadMore[i].pathname.match(/^\/(?:[^\/]+\/$|explore\/)/) && loadMore[i].search.match(/[?&]max_id=/)) {
                     loadMore[i].click();
                     break;
@@ -524,24 +405,11 @@
         };
 
         var autoCloseMobileAppDialog = function() {
-            
-            
-            
-            
-            
-            
             if (location.hash.length < 11) {
                 return;
             }
-
-            
             if (location.hash.indexOf('reactivated') >= 0) {
-                
-                
-                
                 location.hash = '';
-
-                
                 var isClosed = false,
                     closeMobileAppDialog = function() {
                         if (isClosed) {
@@ -551,7 +419,6 @@
                         for (var i = 0; i < dialogs.length; ++i) {
                             var appStoreLink = dialogs[i].querySelector('a[href*="itunes.apple.com"]');
                             if (appStoreLink) {
-                                
                                 var closeButton = dialogs[i].querySelector('button');
                                 if (closeButton) {
                                     closeButton.click();
@@ -564,7 +431,6 @@
                 if (!isClosed) {
                     var attempt = 0,
                         closeDialogInterval = setInterval(function() {
-                            
                             if (isClosed || ++attempt > 30) {
                                 clearInterval(closeDialogInterval);
                                 return;
@@ -575,22 +441,35 @@
             }
         };
 
-        var autoCloseSignupBar = function() {
-            
+        var autoCloseAnnoyingBars = function() {
+            var i, elem, elems;
             var signupBar = document.querySelector('div.coreSpriteLoggedOutGenericUpsell');
             if (signupBar) {
                 var closeButton = signupBar.parentNode.parentNode.querySelector('.coreSpriteDismissLarge[role="button"]');
                 if (closeButton)
                     closeButton.click();
             }
-
-            
             var whiteBar = document.querySelector('.coreSpriteGlyphGradient');
             if (whiteBar) {
                 var signupLink = whiteBar.parentNode.parentNode.parentNode.parentNode.querySelector('a[href*="signup"]');
                 if (signupLink) {
-                    var elem, elems = signupLink.parentNode.parentNode.childNodes;
-                    for (var i = elems.length - 1; i >= 0; --i) {
+                    elems = signupLink.parentNode.parentNode.childNodes;
+                    for (i = elems.length - 1; i >= 0; --i) {
+                        elem = elems[i];
+                        if (elem.tagName === 'SPAN' && elem.textContent === '✕') { 
+                            elem.click();
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            var getAppBar = document.querySelector('.coreSpriteAppIcon');
+            if (getAppBar) {
+                var appStoreLink = getAppBar.parentNode.parentNode.querySelector('a[href*="itunes.apple.com"]');
+                if (appStoreLink) {
+                    elems = appStoreLink.parentNode.parentNode.parentNode.parentNode.parentNode.childNodes;
+                    for (i = elems.length - 1; i >= 0; --i) {
                         elem = elems[i];
                         if (elem.tagName === 'SPAN' && elem.textContent === '✕') { 
                             elem.click();
@@ -600,15 +479,13 @@
                 }
             }
         };
-
         
         setInterval(function() {
             autoLoadMore();
             autoCloseMobileAppDialog();
-            autoCloseSignupBar();
+            autoCloseAnnoyingBars();
         }, 400);
     };
-
     
     var injectHandlers = function() {
         injectMediaMagnifier();
