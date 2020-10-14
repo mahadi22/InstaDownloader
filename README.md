@@ -18,5 +18,5 @@ Alternatively, you can use the keyboard controls, which are definitely a lot mor
 
 # How To Install
 - Install [Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo) (opera/chrome) / [Greasemonkey](https://addons.mozilla.org/en-US/firefox/addon/greasemonkey/) (firefox).
-- Click this link to add the script to tampermonkey/greasemonkey.
+- Click this [link](https://github.com/mahadi22/InstaDownloader/raw/main/InstaDownloader.js) to add the script to tampermonkey/greasemonkey.
 - Happy download media from instagram.
