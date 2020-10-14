@@ -34,23 +34,20 @@
     'use strict';
 
     var injectMediaMagnifier = function() {
-        
         var handleMedia = function(e, url) {
             var i;
 
-            
+
             if (typeof url !== 'string' || url.length < 1) {
                 return true; 
             }
 
-            
             var anchor = document.createElement('a');
             anchor.href = url;
 
             
             var isProtectedUrl = !!(anchor.pathname.match(/\/vp\//) || anchor.search.match(/[?&](?:oh|oe|efg)=/));
 
-            
             var filename = null,
                 filenameOffset = anchor.pathname.lastIndexOf('/');
             if (filenameOffset >= 0) {
@@ -60,14 +57,10 @@
                 }
             }
 
-            
             if (!isProtectedUrl) {
                 
                 anchor.protocol = 'https:';
 
-                
-                
-                
                 if (typeof anchor.search === 'string' && anchor.search.length > 0) {
                     var queryParts = anchor.search.split('&');
                     for (i = queryParts.length - 1; i >= 0; --i) {
@@ -119,17 +112,12 @@
             } else { 
                 location.href = anchor.href;
             }
-
-            
-            
-            
             e.stopPropagation(); 
             e.stopImmediatePropagation(); 
             e.preventDefault(); 
             return false;
         };
 
-        
         var handleElement = function (e, elem) {
             switch (elem.tagName) {
                 case 'IMG':
@@ -612,7 +600,6 @@
             }
         };
 
-        
         
         setInterval(function() {
             autoLoadMore();
