@@ -4,10 +4,13 @@
 // @version         0.0.5
 // @description     View or download images, stories, albums, photos, videos and profile avatars.
 // @author          mahadi22
+// @namespace       mahadi22
+// @homepage        https://github.com/mahadi22/InstaDownloader
+// @license         https://www.apache.org/licenses/LICENSE-2.0
 // @match           *://*.instagram.com/*
 // @run-at          document-start
 // @grant           none
-// @downloadURL none
+// @downloadURL     https://github.com/mahadi22/InstaDownloader/raw/main/user.js
 // ==/UserScript==
 
 /*
