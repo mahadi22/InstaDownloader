@@ -11,6 +11,7 @@
 // @run-at          document-start
 // @grant           none
 // @downloadURL     https://github.com/mahadi22/InstaDownloader/raw/main/user.js
+//@icon             https://raw.githubusercontent.com/mahadi22/InstaDownloader/main/favicon.ico
 // ==/UserScript==
 
 /*
