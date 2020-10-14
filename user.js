@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            InstaDownloader
 // @namespace       mahadi22
-// @version         0.0.5
+// @version         1.1.0
 // @description     View or download images, stories, albums, photos, videos and profile avatars.
 // @author          mahadi22
 // @namespace       mahadi22
@@ -29,12 +29,14 @@
  * - `Alt-F`: View in a new tab/window.
  * - `Shift-Alt-F`: Direct download if supported by browser.
  */
+
 (function() {
     'use strict';
 
     var injectMediaMagnifier = function() {
         var handleMedia = function(e, url) {
             var i;
+
 
             if (typeof url !== 'string' || url.length < 1) {
                 return true; 
@@ -43,6 +45,7 @@
             var anchor = document.createElement('a');
             anchor.href = url;
 
+            
             var isProtectedUrl = !!(anchor.pathname.match(/\/vp\//) || anchor.search.match(/[?&](?:oh|oe|efg)=/));
 
             var filename = null,
@@ -55,7 +58,9 @@
             }
 
             if (!isProtectedUrl) {
+                
                 anchor.protocol = 'https:';
+
                 if (typeof anchor.search === 'string' && anchor.search.length > 0) {
                     var queryParts = anchor.search.split('&');
                     for (i = queryParts.length - 1; i >= 0; --i) {
@@ -107,7 +112,6 @@
             } else { 
                 location.href = anchor.href;
             }
-
             e.stopPropagation(); 
             e.stopImmediatePropagation(); 
             e.preventDefault(); 
@@ -570,11 +574,37 @@
             }
         };
 
-        
+        var autoCloseSignupBar = function() {
+            
+            var signupBar = document.querySelector('div.coreSpriteLoggedOutGenericUpsell');
+            if (signupBar) {
+                var closeButton = signupBar.parentNode.parentNode.querySelector('.coreSpriteDismissLarge[role="button"]');
+                if (closeButton)
+                    closeButton.click();
+            }
+
+            
+            var whiteBar = document.querySelector('.coreSpriteGlyphGradient');
+            if (whiteBar) {
+                var signupLink = whiteBar.parentNode.parentNode.parentNode.parentNode.querySelector('a[href*="signup"]');
+                if (signupLink) {
+                    var elem, elems = signupLink.parentNode.parentNode.childNodes;
+                    for (var i = elems.length - 1; i >= 0; --i) {
+                        elem = elems[i];
+                        if (elem.tagName === 'SPAN' && elem.textContent === '✕') { 
+                            elem.click();
+                            break;
+                        }
+                    }
+                }
+            }
+        };
+
         
         setInterval(function() {
             autoLoadMore();
             autoCloseMobileAppDialog();
+            autoCloseSignupBar();
         }, 400);
     };
 
