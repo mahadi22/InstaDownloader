@@ -1,16 +1,16 @@
 // ==UserScript==
 // @name            InstaDownloader
 // @namespace       mahadi22
-// @version         1.7.3
-// @description     View or download images, stories, albums, photos, videos and profile avatars.
 // @author          mahadi22
+// @version         1.8.1
+// @description     View or download images, stories, albums, photos, videos and profile avatars.
 // @homepage        https://github.com/mahadi22/InstaDownloader
+// @downloadURL     https://github.com/mahadi22/InstaDownloader/raw/main/InstaDownloader.user.js
+// @icon            https://raw.githubusercontent.com/mahadi22/InstaDownloader/main/favicon.ico
 // @license         https://www.apache.org/licenses/LICENSE-2.0
 // @match           *://*.instagram.com/*
 // @run-at          document-start
 // @grant           none
-// @downloadURL     https://github.com/mahadi22/InstaDownloader/raw/main/user.js
-// @icon            https://raw.githubusercontent.com/mahadi22/InstaDownloader/main/favicon.ico
 // ==/UserScript==
 
 /*
@@ -29,28 +29,19 @@
  * - `Alt-F`: View in a new tab/window.
  * - `Shift-Alt-F`: Direct download if supported by browser.
  */
- 
+
 (function() {
     'use strict';
 
     var injectMediaMagnifier = function() {
-        // Perform the user's desired action on a media URL.
         var handleMedia = function(e, url) {
             var i;
-
-            // Do nothing if the URL isn't a string or if it's empty.
             if (typeof url !== 'string' || url.length < 1) {
-                return true; // Let the default browser handler run.
+                return true; 
             }
-
-            // Create an anchor to allow us to easily manipulate the URL.
             var anchor = document.createElement('a');
             anchor.href = url;
-
-            // Determine if this is a protected (signed) media URL which is NOT allowed to be modified.
             var isProtectedUrl = !!(anchor.pathname.match(/\/vp\//) || anchor.search.match(/[?&](?:oh|oe|efg)=/));
-
-            // Attempt to extract the media filename from the URL that we've been given.
             var filename = null,
                 filenameOffset = anchor.pathname.lastIndexOf('/');
             if (filenameOffset >= 0) {
@@ -59,13 +50,8 @@
                     filename = null;
                 }
             }
-
-            // Always enforce HTTPS for download integrity (protects against sudden truncation).
             anchor.protocol = 'https:';
-
-            // Remove useless "se=7", "ig_tt=..." and "ig_cache_key=..." query-params if they exist.
-            // NOTE: We can't just remove the entire query, since some media requires
-            // special protection keys to allow the download to proceed.
+            
             if (typeof anchor.search === 'string' && anchor.search.length > 0) {
                 var queryParts = anchor.search.split('&');
                 for (i = queryParts.length - 1; i >= 0; --i) {
@@ -75,53 +61,29 @@
                 }
                 var newQuery = queryParts.join('&');
                 if (newQuery.length > 0 && newQuery.charAt(0) !== '?') {
-                    newQuery = '?'+newQuery; // Only added if a search query still exists.
+                    newQuery = '?'+newQuery; 
                 }
                 anchor.search = newQuery;
             }
-
-            // Clean up the URL's PATH (via the anchor) to get the unmodified, highest quality media file:
-            // NOTE: Protected URLs do not allow modifying ANY part of the PATH to the file.
+            
             if (!isProtectedUrl) {
-                // Remove bad flags that would cause us to retrieve modified media.
-                //
-                // KEEP:
-                // - /t#.#-#/ = Media type flag. Is REQUIRED for stories.
-                //
-                // DELETE:
-                // - /e#/ = Sets EXIF "FBMD" tag.
-                // - /c#.#.#.#/ = Image cropping.
-                // - /s#x#/ and /p#x#/ = Image downsizing.
-                // - /sh#.#/ = Image sharpening.
-                // - /fr/ = "Fine Resolution"? Not sure, but causes JPG artifacts.
                 var flags = anchor.pathname.split('/');
-                //flags.splice(flags.length - 1, 1); // Optional: Remove filename to avoid parsing as flag.
+                //flags.splice(flags.length - 1, 1); 
                 for (i = flags.length - 1; i >= 0; --i) {
                     if (flags[i].length > 0 && flags[i].match(/^(?:e\d+|c\d+\.\d+\.\d+\.\d+|[sp]\d+x\d+|sh\d+\.?\d*|fr)$/)) {
                         flags.splice(i, 1);
                     }
                 }
-                //anchor.pathname = flags.join('/')+'/'+filename; // Optional: Re-add filename.
+                //anchor.pathname = flags.join('/')+'/'+filename; 
                 anchor.pathname = flags.join('/');
             }
-
-            // The final URL is now in "anchor.href".
-
-            // Perform appropriate action based on the pressed modifier keys.
-            if (e.shiftKey && e.altKey) { // [Shift+Alt]: Download.
+            
+            if (e.shiftKey && e.altKey) { 
                 if (!window.fetch) {
-                    // Turn the anchor into a download-anchor and just click it.
-                    // NOTE: This HTML 5 feature won't work in all browsers, and in fact CORS has been
-                    // disabled in Chrome 65+ due to security, which isn't unexpected since all other
-                    // browsers such as Safari already prevented cross-origin "download"-attr links.
                     anchor.target = '_self';
-                    anchor.download = filename; // Save with bare filename.
+                    anchor.download = filename; 
                     anchor.click();
                 } else {
-                    // The browser supports window.fetch(). Perform asynchronous blob-based download.
-                    // Docs: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
-                    // NOTE: Browsers support up to around 500MB blobs. The largest Instagram
-                    // media I've ever found was a 14MB video. Most videos are around 1-2MB.
                     window.fetch(anchor.href, {
                         headers: new Headers({
                             'Origin': location.origin
@@ -129,25 +91,16 @@
                         mode: 'cors',
                         redirect: 'follow',
                         referrerPolicy: 'no-referrer',
-                        // NOTE: Safari sucks at CORS caching and will re-fetch the URL every time.
-                        // But Chrome on the other hand caches the downloaded file perfectly.
-                        cache: 'force-cache' // https://fetch.spec.whatwg.org/#concept-request-cache-mode
+                        cache: 'force-cache' 
                     }).then(function(response) {
-                        // This triggers immediately when the headers are received (before the body).
-                        // NOTE: There's no way to show the user the download progress (unlike normal
-                        // download URLs which end up in a browser's download list and show progress
-                        // that way), but most media files are tiny and finish quickly.
                         if (!response.ok || response.status !== 200) {
                             throw new Error('Network response was not ok.');
                         }
                         return response.blob();
                     }).then(function(blob) {
-                        // This triggers when the download is 100% complete.
+                        
                         var blobUrl = URL.createObjectURL(blob),
                             a = document.createElement('a');
-                        // Download the blob URL via an anchor. And since a `blob:` URL doesn't
-                        // violate the CORS destination rules, this works in all modern browsers.
-                        // Verified browsers: Safari and Google Chrome.
                         a.href = blobUrl;
                         a.download = filename;
                         a.click();
@@ -157,108 +110,68 @@
                         alert(errMsg);
                     });
                 }
-            } else if (e.altKey) { // [Alt]: Open in a new tab/window.
+            } else if (e.altKey) { 
                 var win = window.open(anchor.href, '_blank');
-                win.focus(); // Bring the tab/window to the foreground.
-            } else { // [Shift/Nothing/Anything Else]: Open in the same tab.
+                win.focus(); 
+            } else { 
                 location.href = anchor.href;
             }
-
-            // Stop the event propagation so that nothing else runs.
-            // And since our event handler is a capture (runs before the target element),
-            // it means that this will prevent navigation to the clicked webpage, if any.
-            e.stopPropagation(); // Prevent parent element event handlers from firing.
-            e.stopImmediatePropagation(); // Prevent any further event handlers on the event-element from firing.
-            e.preventDefault(); // Prevent default browser behavior for this event.
+            e.stopPropagation(); 
+            e.stopImmediatePropagation(); 
+            e.preventDefault(); 
             return false;
         };
-
-        // Process a media element or container (from the event handlers).
         var handleElement = function (e, elem, isLastAttempt) {
             switch (elem.tagName) {
                 case 'IMG':
                 case 'VIDEO':
                 case 'DIV':
                 case 'A':
-                    // IMG: profile avatars (on both timeline and media page).
-                    // VIDEO: not used, but is here to be futureproof.
-                    // DIV: photos/album photos on media page and timeline, video thumbs on timeline.
-                    // A: videos/album videos on media page.
-
-                    // Determine which element to scan, and then look for photos and videos.
-                    // NOTE: Instagram puts the actual media page content as a sibling of the A/DIV
-                    // (within their mutual parent node), which is why we must get the parent.
-                    // And in case of albums, there's only 1 media item at a time (they dynamically
-                    // switch its contents to only have one IMG or VIDEO element at a time).
                     var elemIsMedia = (elem.tagName === 'IMG' || elem.tagName === 'VIDEO'),
                         mediaContainer = (elemIsMedia ? elem : (elem.parentNode || elem)),
                         photos = (mediaContainer.tagName === 'IMG' ? [mediaContainer] : (elemIsMedia ? [] : mediaContainer.getElementsByTagName('img'))),
                         videos = (mediaContainer.tagName === 'VIDEO' ? [mediaContainer] : (elemIsMedia ? [] : mediaContainer.getElementsByTagName('video')));
-
-                    // Only handle the media if there's exactly 1 video or 1 photo.
+                    
                     if (videos.length === 1 && photos.length === 0) {
-                        // NOTE: Some videos use the `src` attribute. Others (notably stories) use child `<source>` elements instead.
                         var src = videos[0].hasAttribute('src') ? videos[0].src : null;
                         if (typeof src !== 'string' || src.length < 1) {
-                            // If there are multiple sources, they're listed in descending quality (the first element is the best).
-                            // NOTE: There's absolutely NOTHING else (no attributes, etc) which indicates which file is the best one.
                             var subSources = videos[0].getElementsByTagName('source');
                             for (var i = 0; i < subSources.length; ++i) {
                                 if (subSources[i].hasAttribute('src') && typeof subSources[i].src === 'string' && subSources[i].src.length >= 1) {
                                     src = subSources[i].src;
-                                    break; // Stop searching through sources.
+                                    break; 
                                 }
                             }
                         }
                         return handleMedia(e, src);
                     } else if (photos.length === 1 && videos.length === 0) {
-                        // NOTE: Many images also have a "srcset" attribute with multiple URLs, but we just need the current "src".
+                        
                         return handleMedia(e, photos[0].src);
                     } else if (!isLastAttempt) {
-                        // If we didn't find anything, the user may have clicked on a story photo/video. Those have their media within TWO parent elements
-                        // rather than one. So by simply retrying once (as a "last attempt"), we will now traverse one step higher and find the media.
+                        
+                        
                         return handleElement(e, mediaContainer, true);
                     }
             }
-
-            return true; // Let the default browser handler run if no valid media was found.
+            return true; 
         };
 
-        // Attach the click event handler.
         document.addEventListener('click', function(e) {
             e = e || window.event;
-
-            // Do nothing if none of our special keys are held while clicking.
             if (!e.shiftKey && !e.altKey) {
-                return true; // Let the default browser handler run.
+                return true; 
             }
-
-            // Handle the click.
             var target = e.target || e.srcElement;
 
             return handleElement(e, target);
-        }, true); // True = Capture BEFORE sending any click-event to the clicked element!
+        }, true); 
 
-        // Attach the keyboard event handler.
         document.addEventListener('keydown', function(e) {
             e = e || window.event;
-
-            // Do nothing if the user is typing in a text field.
             if (e.target && (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT')) {
-                return true; // Let the default browser handler run.
+                return true; 
             }
-
-            // Look for any combination of Alt/Shift together with F.
             if ((e.shiftKey || e.altKey) && e.keyCode === 70) {
-                // Find the media viewer and the currently viewed media.
-                // NOTE: This is the most likely piece of code which may need future updates.
-                // It catches all current Instagram media viewers: Lightbox media viewer,
-                // whole-page media viewer, and the lightbox story media viewer. However,
-                // they're all part of very complex HTML structures without many CSS landmarks,
-                // so this may break whenever Instagram decides to change their website HTML.
-                // But it's the best that we can do... Either way, the click-method always
-                // remains extremely resilient, so users won't be stranded even if this
-                // keyboard method stops working someday... ;-)
                 var mediaPanel = document.querySelector(
                     'div[role="dialog"] article > div:nth-of-type(1), main[role="main"] > * article > div:nth-of-type(1), #react-root > section > div > div > section > div:nth-of-type(2)'
                 );
@@ -271,120 +184,84 @@
                     }
                 }
             }
-
-            return true; // Let the default browser handler run if no valid keypress or no media.
-        }, true); // True = Capture BEFORE sending any typing-event to the active element.
+            return true; 
+        }, true); 
     };
-
     var injectMediaCounter = function() {
-        // Section state class.
         var SectionState = function(section) {
             this.section = section;
             this.loadedMediaIds = new Set();
             this.loadedCount = -1;
             this.totalCount = -1;
-            // Detect the section's media box element, which holds the rows of media. Each child of it is a 3-media row.
-            // NOTE: This selector will need future maintenance if the site design changes.
             this.mediaBoxElem = section ? section.querySelector('main > article > div > div:nth-of-type(1)') : null;
         };
-
-        // Updates the total media (timeline post) count for the section element (profile page).
         SectionState.prototype.updateTotalMediaCount = function() {
-            // NOTE: This path will need future maintenance if it ever changes.
-            // NOTE: Media count also exists in `window._sharedData.entry_data.ProfilePage[0].user.media.count`,
-            // but that value sadly *never* changes when navigating dynamically to other profiles!
-            // NOTE: We look for the language-independent header's <ul> of 3x <li> elements (posts, followers,
-            // following). It contains nested <span> elements, one of which (the last one) is the pure number of posts.
             var mediaCountSpans = this.section.querySelectorAll('header ul > li:nth-of-type(1) span');
-            for (var i = mediaCountSpans.length - 1; i >= 0; --i) { // Count backwards, since the one we want is at the end.
-                // Clean up the count by stripping away thousands-separators (spaces, commas, etc depending on language).
+            for (var i = mediaCountSpans.length - 1; i >= 0; --i) { 
+                
                 var count = mediaCountSpans[i].textContent.replace(/[^0-9]+/g, '');
                 if (count.length > 0) {
                     try {
                         count = parseInt(count, 10);
-                        if (Number.isInteger(count)) { // Guard against NaN.
+                        if (Number.isInteger(count)) { 
                             this.totalCount = count;
                             return;
                         }
                     } catch (e) {}
                 }
             }
-
-            this.totalCount = 0; // If count doesn't exist or couldn't be parsed.
+            this.totalCount = 0; 
         };
-
-        // Updates the loaded media count for the section's media box, and clamps so it never exceeds the total.
         SectionState.prototype.updateLoadedMediaCount = function() {
-            // Instagram uses a dynamic set of media "divs", and only keeps ~50 in memory (for infinite-scroll efficiency).
-            // Therefore, the only way to detect the load progress is to count how many unique IDs we've seen in them.
             var count = 0;
             if (this.mediaBoxElem) {
                 var mediaLinks = this.mediaBoxElem.querySelectorAll('a[href^="/p/"]');
                 for (var i = 0, len = mediaLinks.length; i < len; ++i) {
-                    this.loadedMediaIds.add(mediaLinks[i].pathname); // Format: "/p/<id>/".
+                    this.loadedMediaIds.add(mediaLinks[i].pathname); 
                 }
-
                 count = this.loadedMediaIds.size;
                 if (count > this.totalCount) {
-                    count = this.totalCount; // Ensure that it can never exceed the total.
+                    count = this.totalCount; 
                 }
             }
 
             this.loadedCount = count;
         };
-
-        // Media counter class.
         var MediaCounter = function() {
-            // Initialize properties.
             this.currentProfile = this.extractProfileName(location.pathname);
             this.activeState = null;
             this.counterElem = null;
             this.isCounterVisible = false;
             this.updateCooldownTimer = undefined;
-
-            // Attach handlers and create initial state.
             this.createCounterElem();
             this.attachReactRootObserver();
             this.startWatchingPathname();
         };
 
-        // Creates the media counter element.
         MediaCounter.prototype.createCounterElem = function() {
-            // Create a floating container in the bottom right of the page.
             var floatContainer = document.createElement('div');
             floatContainer.style.position = 'fixed';
             floatContainer.style.bottom = 0;
             floatContainer.style.right = 0;
             floatContainer.style.zIndex = '99999';
-
-            // Add a nicely styled "media counter" container within the floating container.
             var counterElem = document.createElement('div');
-            counterElem.style.margin = '14px'; // Offsets it from the edges.
-            counterElem.style.padding = '5px 10px'; // Empty padding around everything in the container.
+            counterElem.style.margin = '14px'; 
+            counterElem.style.padding = '5px 10px'; 
             counterElem.style.backgroundColor = 'rgba(60,60,60,0.5)';
             counterElem.style.borderRadius = '15px';
             counterElem.style.font = 'bold 13px sans-serif';
             counterElem.style.color = '#fff';
             counterElem.style.textAlign = 'center';
             counterElem.style.textShadow = '1px 1px 2px rgba(0,0,0,0.3)';
-            counterElem.style.display = 'none'; // Start out hidden.
+            counterElem.style.display = 'none'; 
             counterElem.title = 'Shift-[click/F]: View in the same tab.\nAlt-[click/F]: View in a new tab/window.\nShift-Alt-[click/F]: Direct download.';
             floatContainer.appendChild(counterElem);
-
-            // Put the floating counter as a child of the body itself.
-            // NOTE: We don't put it inside of any specific elements, to remain fully markup-agnostic.
             document.body.appendChild(floatContainer);
-
             this.counterElem = counterElem;
         };
-
-        // Extracts the profile name from a Location pathname.
         MediaCounter.prototype.extractProfileName = function(pathname) {
             if (typeof pathname === 'string') {
-                // NOTE: We demand a single word (as in a profile), such as "/foo/",
-                // not "/foo/bar". That avoids most of the custom pages (such as
-                // "/accounts/login/"). We'll also avoid "/developer/".
-                var match = pathname.match(/^\/([^\/]+)\/?$/); // Extracts at least 1 char.
+                var match = pathname.match(/^\/([^\/]+)\/?$/); 
                 if (match) {
                     var profile = match[1];
                     if (profile !== 'developer') {
@@ -392,95 +269,61 @@
                     }
                 }
             }
-
             return null;
         };
 
-        // Watches for navigation between the profile and media overlays, and hides counter during overlays.
-        // NOTE: We can't use HTML5 popstate events for this. They are too unreliable. We must use a timer.
         MediaCounter.prototype.startWatchingPathname = function() {
             var self = this,
                 currentPathname = null;
             setInterval(function() {
-                // Detects when we've moved to a different path on the site.
                 if (location.pathname !== currentPathname) {
                     currentPathname = location.pathname;
-
-                    // Toggle the counter visibility depending on which page we are on.
-                    // NOTE: We only unhide the counter if it already contains a value *and* we're still on the same profile!
                     var profile = self.extractProfileName(currentPathname);
-                    if (profile !== null) { // On a profile page.
-                        if (profile === self.currentProfile && self.counterElem.textContent !== '') { // Same profile, and has existing counter.
+                    if (profile !== null) { 
+                        if (profile === self.currentProfile && self.counterElem.textContent !== '') { 
                             self.toggleMediaCounterVisibility(true);
-                        } else { // Different profile, or has no counter value.
-                            // NOTE: We don't hide it when navigating to a different profile. Because that's handled instantly by our react-root observer.
-                            self.currentProfile = profile; // Track the new profile instead.
+                        } else { 
+                            
+                            self.currentProfile = profile; 
                         }
-                    } else { // On a non-profile page, such as media instead.
+                    } else { 
                         self.toggleMediaCounterVisibility(false);
                     }
                 }
             }, 250);
         };
 
-        // Toggles the media counter visibility whenever we're on a non-timeline page (or overlay).
         MediaCounter.prototype.toggleMediaCounterVisibility = function(showCounter) {
             if (showCounter !== this.isCounterVisible) {
                 this.counterElem.style.display = showCounter ? 'block' : 'none';
                 this.isCounterVisible = !!showCounter;
             }
         };
-
-        // Updates the media counter to the currently loaded count, and ensures that the counter is visible.
+        
         MediaCounter.prototype.updateMediaCounter = function(forceUpdateTotal) {
             if (!this.activeState) {
                 return;
             }
-
-            // Update internal state to current count.
             if (forceUpdateTotal || this.activeState.totalCount < 0) {
-                this.activeState.updateTotalMediaCount(); // Must be updated before loaded count.
+                this.activeState.updateTotalMediaCount(); 
             }
             this.activeState.updateLoadedMediaCount();
-
-            // Set the new media counter text.
-            var percentLoaded = this.activeState.totalCount > 0 ? ((this.activeState.loadedCount / this.activeState.totalCount) * 100) : 0; // No 0-div.
-            percentLoaded = percentLoaded.toFixed(1); // Convert to string with rounding and always 1 decimal.
+            var percentLoaded = this.activeState.totalCount > 0 ? ((this.activeState.loadedCount / this.activeState.totalCount) * 100) : 0; 
+            percentLoaded = percentLoaded.toFixed(1); 
             this.counterElem.textContent = this.activeState.loadedCount+' / '+this.activeState.totalCount+' ('+percentLoaded+'%)';
-
-            // Make sure counter is visible if we're on a profile page, or hidden otherwise.
             this.toggleMediaCounterVisibility(this.extractProfileName(location.pathname) !== null);
         };
-
-        // Adds mutation observer to section. Observes changes in the rows of media items.
-        // NOTE: They trigger once per inserted row and insert 4 rows at once, so we use a slight
-        // "cooldown" timer before we react, to avoid triggering rapid DOM (counter) updates.
+        
         MediaCounter.prototype.observeSection = function(section) {
-            // Create and initialize a blank state for this section.
-            // NOTE: This is always okay (and fast) even if we already had a state for it,
-            // because the counter updater always refreshes the state's counts on update.
             var state = new SectionState(section);
-
-            // Abort if this section didn't contain a media box.
-            // NOTE: This happens due to things like visiting a timeline, then going to the main timeline
-            // which is also loaded as a <section> in the "react-root" just like regular pages.
             if (!state.mediaBoxElem) {
-                // Erase the active state and hide the counter, since we've navigated away from the old section.
                 this.activeState = null;
                 this.toggleMediaCounterVisibility(false);
-                return; // Abort.
+                return; 
             }
-
-            // Make our (the last-called) state the new "active" state.
             this.activeState = state;
-
-            // New profile/state. Force counter update (including new totals).
             this.updateMediaCounter(true);
-
-            // Remove any old (outdated / old state) observer from this section, just in case any still exists.
             this.unobserveSection(section);
-
-            // Add a new mutation observer on the section's media box.
             var self = this,
                 config = { attributes: false, childList: true, characterData: false },
                 observer = new MutationObserver(function(mutations) {
@@ -488,37 +331,30 @@
                         if (mutation.type === 'childList') {
                             clearTimeout(self.updateCooldownTimer);
                             self.updateCooldownTimer = setTimeout(function() {
-                                // Update to our new count, but only if we (this section/media box) are the counter's active state.
                                 if (state === self.activeState) {
                                     self.updateMediaCounter();
                                 }
-                            }, 150); // Wait 150ms before we perform the update.
+                            }, 150); 
                         }
                     });
                 });
             observer.observe(state.mediaBoxElem, config);
-
-            // Attach the observer property, so that we can disconnect it later.
             section.instaMagnifyObserver = observer;
         };
-
-        // Remove mutation observer from section.
+        
         MediaCounter.prototype.unobserveSection = function(section) {
             if (section.instaMagnifyObserver) {
                 section.instaMagnifyObserver.disconnect();
                 delete section.instaMagnifyObserver;
             }
         };
-
-        // Observes node additions/deletions within the react-root.
+        
         MediaCounter.prototype.attachReactRootObserver = function() {
             var self = this,
                 interestingChanges = ['addedNodes', 'removedNodes'],
                 config = { attributes: false, childList: true, characterData: false },
                 observer = new MutationObserver(function(mutations) {
                     mutations.forEach(function(mutation) {
-                        // When the "react-root" gets a new <section> element, it means we've navigated to a different profile.
-                        // NOTE: It can also mean that we've visited the "/accounts/login/" page and other similar ones.
                         if (mutation.type === 'childList') {
                             for (var i = 0; i < interestingChanges.length; ++i) {
                                 var field = interestingChanges[i];
@@ -537,12 +373,10 @@
                     });
                 });
 
-            // Only begin observing if we're on a React-based page.
+            
             var reactRootElem = document.querySelector('span#react-root');
             if (reactRootElem) {
                 observer.observe(reactRootElem, config);
-
-                // Set its current section (if any) as the observed section.
                 var children = reactRootElem.childNodes;
                 for (var i = 0; i < children.length; ++i) {
                     var node = children[i];
@@ -552,29 +386,17 @@
                 }
             }
         };
-
-        // Create the media counter.
+        
         var mediaCounter = new MediaCounter();
     };
 
     var injectAutoActions = function() {
         var autoLoadMore = function() {
-            // Do nothing until the user has scrolled at least 500 pixels down (roughly
-            // the 1st row of media disappearing behind the top bar of the browser window).
-            // NOTE: This simply ensures that we don't waste people's internet bandwidth
-            // by loading pages when they don't even scroll through the profile's media.
             if (window.pageYOffset <= 500) {
                 return;
             }
-
-            // Look for the first "Load more" button we can find, and click it. The button will vanish when clicked,
-            // which means that we won't find anything until another button appears, which is great for performance.
-            // NOTE: This selector is incredibly specific for performance, to avoid scanning all links.
-            // In fact, just the `article > div > a` is enough to find the link. *That's* how specific it is!
             var loadMore = document.querySelectorAll('article > div > a[href*="max_id="]');
             for (var i = 0; i < loadMore.length; ++i) {
-                // NOTE: We look for a "/name/" path (a single path component) or "/explore/*" (places), with a query string that has "max_id=" in its parameters.
-                // We can't verify by looking for any language-specific strings such as "Load more", since Instagram is multilingual.
                 if (loadMore[i].pathname.match(/^\/(?:[^\/]+\/$|explore\/)/) && loadMore[i].search.match(/[?&]max_id=/)) {
                     loadMore[i].click();
                     break;
@@ -583,24 +405,11 @@
         };
 
         var autoCloseMobileAppDialog = function() {
-            // The "Experience the best version of Instagram by getting the mobile app" modal dialog box
-            // only appears when `#reactivated` is in the URL hash. Which means at least 11 characters.
-            // NOTE: Only some accounts get this dialog. It doesn't seem related to whether the mobile app has
-            // been used by the account, because new accounts that haven't used the mobile app don't get it.
-            // It seems to be something about legacy accounts being "reactivated" after a long time, and
-            // them having never used the official apps...
             if (location.hash.length < 11) {
                 return;
             }
-
-            // Proceed if we see the `#reactivated` hash.
             if (location.hash.indexOf('reactivated') >= 0) {
-                // Clear the hash. Instagram doesn't use the hash for anything important, so we'll just
-                // remove all of its contents and set it to `#` (empty hash). If we don't remove the hash,
-                // the popup dialog box will keep re-appearing after the user watches a homepage story...
                 location.hash = '';
-
-                // Help the user quickly close the popup box...
                 var isClosed = false,
                     closeMobileAppDialog = function() {
                         if (isClosed) {
@@ -610,7 +419,6 @@
                         for (var i = 0; i < dialogs.length; ++i) {
                             var appStoreLink = dialogs[i].querySelector('a[href*="itunes.apple.com"]');
                             if (appStoreLink) {
-                                // The dialog has multiple close buttons. It doesn't matter which we use. Get the first one.
                                 var closeButton = dialogs[i].querySelector('button');
                                 if (closeButton) {
                                     closeButton.click();
@@ -623,7 +431,6 @@
                 if (!isClosed) {
                     var attempt = 0,
                         closeDialogInterval = setInterval(function() {
-                            // Allow up to 30 retries (takes 7.5 seconds at 250ms each).
                             if (isClosed || ++attempt > 30) {
                                 clearInterval(closeDialogInterval);
                                 return;
@@ -636,16 +443,12 @@
 
         var autoCloseAnnoyingBars = function() {
             var i, elem, elems;
-
-            // First handle their black, modern, semi-transparent "signup" bar... This is the one they show most often.
             var signupBar = document.querySelector('div.coreSpriteLoggedOutGenericUpsell');
             if (signupBar) {
                 var closeButton = signupBar.parentNode.parentNode.querySelector('.coreSpriteDismissLarge[role="button"]');
                 if (closeButton)
                     closeButton.click();
             }
-
-            // Also handle their white, old-school, opaque "Sign up to see photos from your friends" alternative bar...
             var whiteBar = document.querySelector('.coreSpriteGlyphGradient');
             if (whiteBar) {
                 var signupLink = whiteBar.parentNode.parentNode.parentNode.parentNode.querySelector('a[href*="signup"]');
@@ -653,15 +456,14 @@
                     elems = signupLink.parentNode.parentNode.childNodes;
                     for (i = elems.length - 1; i >= 0; --i) {
                         elem = elems[i];
-                        if (elem.tagName === 'SPAN' && elem.textContent === '✕') { // We check this to be 100% sure we've found it.
+                        if (elem.tagName === 'SPAN' && elem.textContent === '✕') { 
                             elem.click();
                             break;
                         }
                     }
                 }
             }
-
-            // Lastly, handle their "Experience the best version of Instagram by getting the app." bar, which is at the bottom when logged in.
+            
             var getAppBar = document.querySelector('.coreSpriteAppIcon');
             if (getAppBar) {
                 var appStoreLink = getAppBar.parentNode.parentNode.querySelector('a[href*="itunes.apple.com"]');
@@ -669,7 +471,7 @@
                     elems = appStoreLink.parentNode.parentNode.parentNode.parentNode.parentNode.childNodes;
                     for (i = elems.length - 1; i >= 0; --i) {
                         elem = elems[i];
-                        if (elem.tagName === 'SPAN' && elem.textContent === '✕') { // We check this to be 100% sure we've found it.
+                        if (elem.tagName === 'SPAN' && elem.textContent === '✕') { 
                             elem.click();
                             break;
                         }
@@ -677,17 +479,14 @@
                 }
             }
         };
-
-        // Perform the automatic actions at regular intervals.
-        // NOTE: They are optimized to be fast when there's nothing to do.
+        
         setInterval(function() {
             autoLoadMore();
             autoCloseMobileAppDialog();
             autoCloseAnnoyingBars();
         }, 400);
     };
-
-    // Inject the code...
+    
     var injectHandlers = function() {
         injectMediaMagnifier();
         injectMediaCounter();
