@@ -2,7 +2,7 @@
 // @name            InstaDownloader
 // @namespace       mahadi22
 // @author          mahadi22
-// @version         1.9.0
+// @version         1.9.3
 // @description     View or download images, stories, albums, photos, videos and profile avatars.
 // @homepage        https://github.com/mahadi22/InstaDownloader
 // @downloadURL     https://github.com/mahadi22/InstaDownloader/raw/main/InstaDownloader.user.js
@@ -14,7 +14,7 @@
 // ==/UserScript==
 
 (function() {
-    'use strict';
+'use strict';
 
     var injectMediaMagnifier = function() {
         var handleMedia = function(e, url) {
@@ -488,11 +488,8 @@
             }
         } );
     }
-})();
-
-;(function () {
-  'use strict'
-
+	
+	// part2
   const $ = (selector) => document.querySelector(selector)
   const $$ = (selector) => document.querySelectorAll(selector)
 
@@ -618,4 +615,5 @@
     btnClass: 'download-btn',
     wrap: '._gxii9'
   })
-})()
+  
+})();
